@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tax Visualised</title>
+
+  <style>
+    body {
+      margin: 0;
+      height: 50000vh;
+      /* Add height to enable scrolling */
+      background-color: #242424;
+      /* Dark background */
+      color: #ffffff;
+      /* Light text color */
+      font-family: 'Roboto', sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .stats {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.1rem;
+
+      padding: 20px;
+      display: flex;
+      gap: 12px;
+      flex-direction: row;
+      justify-content: space-around;
+
+    }
+
+    .glass {
+      color: #fff;
+      border-radius: 10px;
+      backdrop-filter: blur(1px);
+      background-color: rgba(0, 0, 0, 0.4);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+      gap: 8px;
+      width: 100%;
+      /* Ensure enough space for large numbers */
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+    }
+
+    .disclaimer {
+      position: fixed;
+      bottom: 4px;
+      left: 12px;
+      font-size: 0.8rem;
+      color: #999999;
+    }
+
+    .coin-counts {
+      position: fixed;
+      bottom: 60px;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+      color: #fff;
+      font-size: 1.2rem;
+      text-align: center;
+    }
+
+    .coin-count {
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+      justify-content: end;
+      gap: 8px;
+      transform: translateX(.6rem);
+      padding: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="myCanvas"></canvas>
+  <div class="stats glass">
+    <div class="stat-item">
+      <span class="stat-label">Gross</span>
+      <span id="grossIncomeDisplay">₹0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Net</span>
+      <span id="netIncomeDisplay">₹0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Tax</span>
+      <span id="taxDisplay">₹0</span>
+    </div>
+  </div>
+  <div class="coin-counts">
+    <div class="coin-count">
+      <span id="leftCount">0%</span>
+    </div>
+    <div class="coin-count glass">
+      <span id="rightCount">0%</span>
+      <span style="font-size: 1rem;">Income Tax</span>
+    </div>
+  </div>
+  <p class="disclaimer">Representation based on Budget 2024-2025</p>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const requestIdRef = { current: undefined };
+      const lastScrollY = { current: 0 };
+      let coinPositions = [];
+      let coinsOnLeft = 0;
+      let coinsOnRight = 0;
+      let income = 0;
+
+      const canvas = document.getElementById('myCanvas');
+      const ctx = canvas?.getContext('2d');
+      const grossIncomeDisplay = document.getElementById('grossIncomeDisplay');
+      const taxDisplay = document.getElementById('taxDisplay');
+      const netIncomeDisplay = document.getElementById('netIncomeDisplay');
+
+      const setCanvasSize = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        animate(); // Redraw canvas after resizing
+      };
+      generateCoinPositions(); // Generate coin positions after resizing
+      setCanvasSize();
+
+      function generateCoinPositions() {
+        const positions = [];
+        const spread = 100; // How far coins can spread horizontally
+        const heightOffset = 1.5; // Vertical spacing between coins
+
+        for (let i = 0; i < 1000; i++) { // Updated to 100 coins
+          const offsetX = Math.random() * spread - spread / 2;
+          const offsetY = Math.random() * heightOffset;
+          const layer = Math.floor(i / 3); // Creates layers of coins
+          positions.push({ x: offsetX, y: offsetY - (layer * heightOffset) });
+        }
+        coinPositions = positions;
+      }
+
+      function drawCoins({ x, y, radius, count }) {
+        for (let i = 0; i < count; i++) {
+          if (ctx && coinPositions[i]) {
+            const { x: offsetX, y: offsetY } = coinPositions[i];
+
+            // Draw shadow
+            ctx.beginPath();
+            ctx.ellipse(
+              x + offsetX,
+              y + offsetY,
+              radius,
+              radius * 0.4,
+              0,
+              0,
+              Math.PI * 2
+            );
+            ctx.fillStyle = 'rgba(255,255,255,0.2)'; // Light shadow for dark mode
+            ctx.fill();
+
+            // Draw coin
+            ctx.beginPath();
+            ctx.arc(
+              x + offsetX,
+              y + offsetY - 2,
+              radius,
+              0,
+              Math.PI * 2
+            );
+            ctx.fillStyle = '#FFD700';
+            ctx.fill();
+            ctx.strokeStyle = '#DAA520';
+            ctx.stroke();
+
+            // Draw rupee symbol
+            ctx.font = `${radius}px Arial`;
+            ctx.fillStyle = '#000';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('₹', x + offsetX, y + offsetY - 2);
+          }
+        }
+      }
+
+      function calculateIncomeTaxPercent(income) {
+        /**
+         * Calculate the net tax payable under the new tax regime (Section 115BAC), including rebate under Section 87A.
+         *
+         * @param {number} income - Total income of the individual.
+         * @returns {number} Net tax payable.
+         */
+
+        const standardDeduction = 75000;
+        income = income - standardDeduction;
+
+        function calculateTaxWithRebate(income) {
+          let taxBySlab = 0;
+          // Define tax calculation based on updated income slabs
+          if (income <= 300000) {
+            taxBySlab = 0;
+          } else if (income <= 700000) {
+            taxBySlab = (income - 300000) * 0.05;
+          } else if (income <= 1000000) {
+            taxBySlab = (400000 * 0.05) + ((income - 700000) * 0.10);
+          } else if (income <= 1200000) {
+            taxBySlab = (400000 * 0.05) + (300000 * 0.10) + ((income - 1000000) * 0.15);
+          } else if (income <= 1500000) {
+            taxBySlab = (400000 * 0.05) + (300000 * 0.10) + (200000 * 0.15) + ((income - 1200000) * 0.20);
+          } else {
+            taxBySlab = (400000 * 0.05) + (300000 * 0.10) + (200000 * 0.15) + (300000 * 0.20) + ((income - 1500000) * 0.30);
+          }
+
+          // Check for Section 87A rebate
+          let rebate = 0;
+          if (income <= 700000) {
+            rebate = Math.min(taxBySlab, 25000);
+          } else if (income > 700000) {
+            const excessIncome = income - 700000;
+            rebate = Math.max(0, taxBySlab - excessIncome);
+          }
+
+          return taxBySlab - rebate;
+        }
+
+        let taxWithRebate = calculateTaxWithRebate(income);
+
+        function calculateSurcharge(income, taxWithRebate) {
+          let surcharge = 0;
+          if (income > 5000000 && income <= 10000000) {
+            surcharge = taxWithRebate * 0.1;
+          } else if (income > 10000000 && income <= 20000000) {
+            surcharge = taxWithRebate * 0.15;
+          } else if (income > 20000000) {
+            surcharge = taxWithRebate * 0.25;
+          }
+          return surcharge;
+        }
+
+        // Surcharge
+        let surcharge = calculateSurcharge(income, taxWithRebate);
+
+        // Marginal relief
+        let marginalRelief = 0;
+        if (income > 5000000 && income <= 10000000) {
+          let incomeOver50L = income - 5000000;
+          let taxOn50LWithRebate = calculateTaxWithRebate(5000000);
+          let taxOnIncomeWithSurcharge = taxWithRebate + surcharge;
+          let excessTax = taxOnIncomeWithSurcharge - taxOn50LWithRebate;
+          marginalRelief = Math.min(0, incomeOver50L - excessTax);
+        } else if (income > 10000000 && income <= 20000000) {
+          let incomeOver1Cr = income - 10000000;
+          let taxOn1CrWithRebate = calculateTaxWithRebate(10000000);
+          let taxOn1CrWithSurcharge = taxOn1CrWithRebate + calculateSurcharge(10000000, taxOn1CrWithRebate);
+          let taxOnIncomeWithSurcharge = taxWithRebate + surcharge;
+          let excessTax = taxOnIncomeWithSurcharge - taxOn1CrWithSurcharge;
+          marginalRelief = Math.min(0, incomeOver1Cr - excessTax);
+        } else if (income > 20000000) {
+          let incomeOver2Cr = income - 20000000;
+          let taxOn2CrWithRebate = calculateTaxWithRebate(20000000);
+          let taxOn2CrWithSurcharge = taxOn2CrWithRebate + calculateSurcharge(20000000, taxOn2CrWithRebate);
+          let taxOnIncomeWithSurcharge = taxWithRebate + surcharge;
+          let excessTax = taxOnIncomeWithSurcharge - taxOn2CrWithSurcharge;
+          marginalRelief = Math.min(0, incomeOver2Cr - excessTax);
+        }
+
+        let taxWithSurcharge = taxWithRebate + surcharge + marginalRelief;
+
+        // Add health and education cess (4% of net tax)
+        const cess = taxWithSurcharge * 0.04;
+        let netTax = taxWithSurcharge + cess;
+
+        return netTax;
+      }
+
+      function calculateCoins() {
+        const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+        const grossIncome = Math.max(1000, Math.floor(scrollPercent * 100000000));
+        const totalCoins = 1000;
+        const tax = calculateIncomeTaxPercent(grossIncome);
+        const taxPercent = tax / grossIncome;
+        coinsOnLeft = Math.floor(totalCoins * (1 - taxPercent));
+        coinsOnRight = totalCoins - coinsOnLeft;
+        const netIncome = grossIncome - tax;
+        grossIncomeDisplay.textContent = `₹${grossIncome.toLocaleString()}`;
+        taxDisplay.textContent = `₹${Math.round(tax).toLocaleString()}`;
+        netIncomeDisplay.textContent = `₹${Math.round(netIncome).toLocaleString()}`;
+
+        // Update coin count displays
+        document.getElementById('leftCount').textContent = `${(coinsOnLeft / 10).toFixed(1)}%`;
+        document.getElementById('rightCount').textContent = `${(coinsOnRight / 10).toFixed(1)}%`;
+      }
+
+      function animate() {
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Calculate number of coins based on scroll
+        calculateCoins();
+
+        const x1 = window.innerWidth / 4;
+        const x2 = (window.innerWidth / 4) * 3;
+
+        drawCoins({ x: x1, y: window.innerHeight - 130, radius: 10, count: coinsOnLeft });
+        drawCoins({ x: x2, y: window.innerHeight - 130, radius: 10, count: coinsOnRight });
+
+        lastScrollY.current = window.scrollY;
+        requestIdRef.current = undefined; // Reset requestIdRef.current after each frame
+      }
+
+      function handleScroll() {
+        if (lastScrollY.current !== window.scrollY) {
+          if (!requestIdRef.current) {
+            requestIdRef.current = requestAnimationFrame(animate);
+          }
+        }
+      }
+
+      window.addEventListener('scroll', handleScroll);
+      window.addEventListener('resize', setCanvasSize);
+
+      function scrollToBottom() {
+        const scrollHeight = document.documentElement.scrollHeight;
+        const scrollStep = scrollHeight / 500000;
+        let currentScroll = 0;
+        let shouldScroll = true;
+
+        // Stop scrolling on user interaction
+        const stopScroll = () => {
+          shouldScroll = false;
+        };
+
+        // Add event listeners for user interactions
+        document.addEventListener('wheel', stopScroll);
+        document.addEventListener('touchstart', stopScroll);
+        document.addEventListener('keydown', stopScroll);
+
+        function step() {
+          if (shouldScroll && currentScroll < scrollHeight - window.innerHeight) {
+            window.scrollBy(0, scrollStep);
+            currentScroll += scrollStep;
+            requestAnimationFrame(step);
+          }
+        }
+
+        step();
+      }
+      scrollToBottom();
+
+      // Cleanup on unload
+      window.addEventListener('unload', () => {
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', setCanvasSize);
+        if (requestIdRef.current) {
+          cancelAnimationFrame(requestIdRef.current);
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
