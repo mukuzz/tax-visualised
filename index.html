@@ -58,6 +58,7 @@
 
     .stat-label {
       font-size: 0.9rem;
+      white-space: nowrap;
     }
 
     .disclaimer {
@@ -101,12 +102,8 @@
       <span id="grossIncomeDisplay">₹0</span>
     </div>
     <div class="stat-item">
-      <span class="stat-label">Net</span>
+      <span class="stat-label">Net (AY 2026-2027)</span>
       <span id="netIncomeDisplay">₹0</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-label">Tax</span>
-      <span id="taxDisplay">₹0</span>
     </div>
   </div>
   <div class="coin-counts">
@@ -114,11 +111,17 @@
       <span id="leftCount">0%</span>
     </div>
     <div class="coin-count glass">
+      <span id="altCount">0%</span>
+      <span style="font-size: 0.8rem;">Tax: <span id="altTaxDisplay">₹0</span></span>
+      <span style="font-size: 0.6rem;">AY 2025-2026</span>
+    </div>
+    <div class="coin-count glass">
       <span id="rightCount">0%</span>
-      <span style="font-size: 1rem;">Income Tax</span>
+      <span style="font-size: 0.8rem;">Tax: <span id="taxDisplay">₹0</span></span>
+      <span style="font-size: 0.6rem;">AY 2026-2027</span>
     </div>
   </div>
-  <p class="disclaimer">Representation based on Budget 2024-2025</p>
+  <p class="disclaimer">Representation based on New Tax Regime. Scroll to interact.</p>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const requestIdRef = { current: undefined };
@@ -126,6 +129,7 @@
       let coinPositions = [];
       let coinsOnLeft = 0;
       let coinsOnRight = 0;
+      let coinsOnMiddle = 0;
       let income = 0;
 
       const canvas = document.getElementById('myCanvas');
@@ -133,6 +137,7 @@
       const grossIncomeDisplay = document.getElementById('grossIncomeDisplay');
       const taxDisplay = document.getElementById('taxDisplay');
       const netIncomeDisplay = document.getElementById('netIncomeDisplay');
+      const altTaxDisplay = document.getElementById('altTaxDisplay');
 
       const setCanvasSize = () => {
         canvas.width = window.innerWidth;
@@ -144,7 +149,7 @@
 
       function generateCoinPositions() {
         const positions = [];
-        const spread = 100; // How far coins can spread horizontally
+        const spread = 70; // How far coins can spread horizontally
         const heightOffset = 1.5; // Vertical spacing between coins
 
         for (let i = 0; i < 1000; i++) { // Updated to 100 coins
@@ -199,7 +204,99 @@
         }
       }
 
-      function calculateIncomeTaxPercent(income) {
+      function calculateIncomeTax(income) {
+        /**
+         * Calculate the net tax payable under the new tax regime (Section 115BAC), including rebate under Section 87A.
+         *
+         * @param {number} income - Total income of the individual.
+         * @returns {number} Net tax payable.
+         */
+
+        const standardDeduction = 75000;
+        income = income - standardDeduction;
+
+        function calculateTaxWithRebate(income) {
+          let taxBySlab = 0;
+          // Define tax calculation based on updated income slabs
+          if (income <= 400000) {
+            taxBySlab = 0;
+          } else if (income <= 800000) {
+            taxBySlab = (income - 400000) * 0.05;
+          } else if (income <= 1200000) {
+            taxBySlab = (400000 * 0.05) + ((income - 800000) * 0.10);
+          } else if (income <= 1600000) {
+            taxBySlab = (400000 * 0.05) + (400000 * 0.10) + ((income - 1200000) * 0.15);
+          } else if (income <= 2000000) {
+            taxBySlab = (400000 * 0.05) + (400000 * 0.10) + (400000 * 0.15) + ((income - 1600000) * 0.20);
+          } else if (income <= 2400000) {
+            taxBySlab = (400000 * 0.05) + (400000 * 0.10) + (400000 * 0.15) + (400000 * 0.20) + ((income - 2000000) * 0.20);
+          } else {
+            taxBySlab = (400000 * 0.05) + (400000 * 0.10) + (400000 * 0.15) + (400000 * 0.20) + (400000 * 0.25) + ((income - 2400000) * 0.30);
+          }
+
+          // Check for Section 87A rebate
+          let rebate = 0;
+          if (income <= 1200000) {
+            rebate = Math.min(taxBySlab, 60000);
+          } else if (income > 1200000) {
+            const excessIncome = income - 1200000;
+            rebate = Math.max(0, taxBySlab - excessIncome);
+          }
+
+          return taxBySlab - rebate;
+        }
+
+        let taxWithRebate = calculateTaxWithRebate(income);
+
+        function calculateSurcharge(income, taxWithRebate) {
+          let surcharge = 0;
+          if (income > 5000000 && income <= 10000000) {
+            surcharge = taxWithRebate * 0.1;
+          } else if (income > 10000000 && income <= 20000000) {
+            surcharge = taxWithRebate * 0.15;
+          } else if (income > 20000000) {
+            surcharge = taxWithRebate * 0.25;
+          }
+          return surcharge;
+        }
+
+        // Surcharge
+        let surcharge = calculateSurcharge(income, taxWithRebate);
+
+        // Marginal relief
+        let marginalRelief = 0;
+        if (income > 5000000 && income <= 10000000) {
+          let incomeOver50L = income - 5000000;
+          let taxOn50LWithRebate = calculateTaxWithRebate(5000000);
+          let taxOnIncomeWithSurcharge = taxWithRebate + surcharge;
+          let excessTax = taxOnIncomeWithSurcharge - taxOn50LWithRebate;
+          marginalRelief = Math.min(0, incomeOver50L - excessTax);
+        } else if (income > 10000000 && income <= 20000000) {
+          let incomeOver1Cr = income - 10000000;
+          let taxOn1CrWithRebate = calculateTaxWithRebate(10000000);
+          let taxOn1CrWithSurcharge = taxOn1CrWithRebate + calculateSurcharge(10000000, taxOn1CrWithRebate);
+          let taxOnIncomeWithSurcharge = taxWithRebate + surcharge;
+          let excessTax = taxOnIncomeWithSurcharge - taxOn1CrWithSurcharge;
+          marginalRelief = Math.min(0, incomeOver1Cr - excessTax);
+        } else if (income > 20000000) {
+          let incomeOver2Cr = income - 20000000;
+          let taxOn2CrWithRebate = calculateTaxWithRebate(20000000);
+          let taxOn2CrWithSurcharge = taxOn2CrWithRebate + calculateSurcharge(20000000, taxOn2CrWithRebate);
+          let taxOnIncomeWithSurcharge = taxWithRebate + surcharge;
+          let excessTax = taxOnIncomeWithSurcharge - taxOn2CrWithSurcharge;
+          marginalRelief = Math.min(0, incomeOver2Cr - excessTax);
+        }
+
+        let taxWithSurcharge = taxWithRebate + surcharge + marginalRelief;
+
+        // Add health and education cess (4% of net tax)
+        const cess = taxWithSurcharge * 0.04;
+        let netTax = taxWithSurcharge + cess;
+
+        return netTax;
+      }
+
+      function calculateAltIncomeTax(income) {
         /**
          * Calculate the net tax payable under the new tax regime (Section 115BAC), including rebate under Section 87A.
          *
@@ -293,14 +390,20 @@
         const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
         const grossIncome = Math.max(1000, Math.floor(scrollPercent * 100000000));
         const totalCoins = 1000;
-        const tax = calculateIncomeTaxPercent(grossIncome);
+        const tax = calculateIncomeTax(grossIncome);
         const taxPercent = tax / grossIncome;
         coinsOnLeft = Math.floor(totalCoins * (1 - taxPercent));
-        coinsOnRight = totalCoins - coinsOnLeft;
+        coinsOnRight = Math.floor(totalCoins * taxPercent);
         const netIncome = grossIncome - tax;
         grossIncomeDisplay.textContent = `₹${grossIncome.toLocaleString()}`;
         taxDisplay.textContent = `₹${Math.round(tax).toLocaleString()}`;
         netIncomeDisplay.textContent = `₹${Math.round(netIncome).toLocaleString()}`;
+
+        const altTax = calculateAltIncomeTax(grossIncome);
+        const altTaxPercent = altTax / grossIncome;
+        coinsOnMiddle = Math.floor(totalCoins * altTaxPercent);
+        altTaxDisplay.textContent = `₹${Math.round(altTax).toLocaleString()}`;
+        document.getElementById('altCount').textContent = `${(coinsOnMiddle / 10).toFixed(1)}%`;
 
         // Update coin count displays
         document.getElementById('leftCount').textContent = `${(coinsOnLeft / 10).toFixed(1)}%`;
@@ -316,11 +419,12 @@
         // Calculate number of coins based on scroll
         calculateCoins();
 
-        const x1 = window.innerWidth / 4;
-        const x2 = (window.innerWidth / 4) * 3;
-
+        const x1 = (window.innerWidth / 8) * 1.33;
+        const x2 = (window.innerWidth / 8) * 4;
+        const x3 = (window.innerWidth / 8) * 6.66;
         drawCoins({ x: x1, y: window.innerHeight - 130, radius: 10, count: coinsOnLeft });
-        drawCoins({ x: x2, y: window.innerHeight - 130, radius: 10, count: coinsOnRight });
+        drawCoins({ x: x2, y: window.innerHeight - 130, radius: 10, count: coinsOnMiddle });
+        drawCoins({ x: x3, y: window.innerHeight - 130, radius: 10, count: coinsOnRight });
 
         lastScrollY.current = window.scrollY;
         requestIdRef.current = undefined; // Reset requestIdRef.current after each frame
