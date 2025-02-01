@@ -392,7 +392,7 @@
         const totalCoins = 1000;
         const tax = calculateIncomeTax(grossIncome);
         const taxPercent = tax / grossIncome;
-        coinsOnLeft = Math.floor(totalCoins * (1 - taxPercent));
+        coinsOnLeft = Math.ceil(totalCoins * (1 - taxPercent));
         coinsOnRight = Math.floor(totalCoins * taxPercent);
         const netIncome = grossIncome - tax;
         grossIncomeDisplay.textContent = `₹${grossIncome.toLocaleString()}`;
