@@ -388,7 +388,7 @@
 
       function calculateCoins() {
         const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
-        const grossIncome = Math.max(1000, Math.floor(scrollPercent * 100000000));
+        const grossIncome = scrollPercent * 100000000 + 775000;
         const totalCoins = 1000;
         const tax = calculateIncomeTax(grossIncome);
         const taxPercent = tax / grossIncome;
