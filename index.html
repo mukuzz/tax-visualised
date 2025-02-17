@@ -30,7 +30,7 @@
       top: 24px;
       left: 50%;
       transform: translateX(-50%);
-      font-size: 1.1rem;
+      font-size: 1rem;
 
       padding: 20px;
       display: flex;
@@ -57,7 +57,7 @@
     }
 
     .stat-label {
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       white-space: nowrap;
     }
 
@@ -78,7 +78,7 @@
       flex-direction: row;
       justify-content: space-around;
       color: #fff;
-      font-size: 1.2rem;
+      font-size: 1rem;
       text-align: center;
     }
 
@@ -102,7 +102,11 @@
       <span id="grossIncomeDisplay">₹0</span>
     </div>
     <div class="stat-item">
-      <span class="stat-label">Net (AY 2026-2027)</span>
+      <span class="stat-label">Net (AY 25-26)</span>
+      <span id="altNetIncomeDisplay">₹0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Net (AY 26-27)</span>
       <span id="netIncomeDisplay">₹0</span>
     </div>
   </div>
@@ -121,7 +125,7 @@
       <span style="font-size: 0.6rem;">AY 2026-2027</span>
     </div>
   </div>
-  <p class="disclaimer">Representation based on New Tax Regime. Scroll to interact.</p>
+  <p class="disclaimer">Scroll to interact. Representation based on New Tax Regime.</p>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const requestIdRef = { current: undefined };
@@ -137,6 +141,7 @@
       const grossIncomeDisplay = document.getElementById('grossIncomeDisplay');
       const taxDisplay = document.getElementById('taxDisplay');
       const netIncomeDisplay = document.getElementById('netIncomeDisplay');
+      const altNetIncomeDisplay = document.getElementById('altNetIncomeDisplay');
       const altTaxDisplay = document.getElementById('altTaxDisplay');
 
       const setCanvasSize = () => {
@@ -402,7 +407,9 @@
         const altTax = calculateAltIncomeTax(grossIncome);
         const altTaxPercent = altTax / grossIncome;
         coinsOnMiddle = Math.floor(totalCoins * altTaxPercent);
+        const altNetIncome = grossIncome - altTax;
         altTaxDisplay.textContent = `₹${Math.round(altTax).toLocaleString()}`;
+        altNetIncomeDisplay.textContent = `₹${Math.round(altNetIncome).toLocaleString()}`;
         document.getElementById('altCount').textContent = `${(coinsOnMiddle / 10).toFixed(1)}%`;
 
         // Update coin count displays
